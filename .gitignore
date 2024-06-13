@@ -1,2 +1,11 @@
+.idea/
 .DS_Store
-Code/.DS_Store
+*/.DS_Store
+results/
+raw_data/
+processed_data/
+main_paper_plot_data/
+__pycache__/
+*/__pycache__/
+*/*/__pycache__/
+codes/SI_codes/MultiscaleMixing/.ipynb_checkpoints/
