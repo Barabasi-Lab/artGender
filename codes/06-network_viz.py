@@ -220,8 +220,8 @@ ins_gender_neutral_dict = json.load(open(os.path.join(year_folder, "gender_neutr
 ins_gender_balance_dict = json.load(open(os.path.join(year_folder, "gender_balance_ins.json")))
 selected_nodes = list(map(int, list(ins_gender_neutral_dict.keys())))
 
-# support, confidence, contribution, lift = get_rules(
-#     shows_select, fname="full_asso_contribution_filter", selected_nodes=selected_nodes)
+support, confidence, contribution, lift = get_rules(
+    shows_select, fname="full_asso_default_filter", selected_nodes=selected_nodes)
 
 support, confidence, contribution, lift = get_rules(
     shows_select, fname="full_asso", selected_nodes=selected_nodes, support_threhold=0, confidence_threshold=0,
