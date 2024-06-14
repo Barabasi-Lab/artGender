@@ -1,0 +1,12 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite it as below."
+authors:
+  - family-names: Wang
+    given-names: Xindi
+    orcid: https://orcid.org/0009-0005-1288-2076
+title: "Quantifying Institutional Gender Inequality in Contemporary Visual Art"
+version: 1.0.0
+identifiers:
+  - type: doi
+    value: 10.5281/zenodo.11658593
+date-released: 2024-06-14
