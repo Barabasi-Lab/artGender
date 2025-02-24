@@ -161,7 +161,7 @@ class ProcessData:
 
     def save_data(self):
         self.shows_with_person_with_gender[["show", "artist", "gender_recog", "institution", "percentile_prestige", "show_year", "country"]].to_csv(os.path.join(self.save_data_path, "shows.csv"), index=False)
-        self.solo_shows_with_person_with_gender[["artist", "gender_recog", "institution", "show_year", "country"]].to_csv(os.path.join(self.save_data_path, "solo_shows.csv"), index=False)
+        self.solo_shows_with_person_with_gender[["show", "artist", "gender_recog", "institution", "percentile_prestige", "show_year", "country"]].to_csv(os.path.join(self.save_data_path, "solo_shows.csv"), index=False)
         json.dump(self.percentile_prestige, open(os.path.join(self.save_data_path, "percentile_prestige.json"), "w"))
         self.career_start_end.to_csv(os.path.join(self.save_data_path, "career_span.csv"), index=False)
         self.sales_person[["auction", "artist", "gender_recog", "medium", "price real", "price relative", "price/avg"]].to_csv(os.path.join(self.save_data_path, "sales.csv"), index=False)

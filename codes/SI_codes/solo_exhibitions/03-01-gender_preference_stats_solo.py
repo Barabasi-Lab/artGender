@@ -13,7 +13,8 @@ from scipy import stats
 from plot_config import *
 
 mpl.rcParams['hatch.linewidth'] = 2
-
+darker_colors = ["#ADC4EA", "#FFA7B8", "#9CE3D1"]  # balance
+lighter_colors = ["#cddbf2", "#ffd3db", "#cdf1e8"]  # neutral
 
 def make_autopct(sizes):
     def absolute_value(val):
@@ -31,9 +32,6 @@ class PlotGenderPreference():
         self.career_start_threshold = career_start_threshold
         self.preference_type = preference_type
         self.save = save
-
-        darker_colors = ["#ADC4EA", "#FFA7B8", "#9CE3D1"]  # balance
-        lighter_colors = ["#cddbf2", "#ffd3db", "#cdf1e8"]  # neutral
 
         if self.preference_type == "neutral":
             sns.set_palette(sns.color_palette(lighter_colors))
@@ -66,7 +64,7 @@ class PlotGenderPreference():
         self.artists_recog_select = pd.read_csv(os.path.join(self.save_data_path, "artists_recog_select.csv"))
         self.shows_select = pd.read_csv(os.path.join(self.save_data_path, "shows_select.csv"))
         self.gender_preference_dict = json.load(open(
-            os.path.join(self.save_fig_path, f"gender_{self.preference_type}_ins_solo.json")))
+            os.path.join(self.save_fig_path, f"gender_{self.preference_type}_ins_solo_bf10.json")))
 
         self.ins_info_df = self.get_ins_info_df()
         self.gender_preference_df, self.museum_gender_preference_df, self.gallery_gender_preference_df = self.get_gender_preference_df()
@@ -99,7 +97,7 @@ class PlotGenderPreference():
             [np.percentile(ins_info_df[ins_info_df["gender_preference"] != -1]["prestige"], percentile)
              for percentile in [10, 20, 30, 40, 50, 60, 70, 80, 90]] + [1.1])
         ins_info_df["prestige_tenth_bin"] = [np.digitize(item, tenth_bins) for item in ins_info_df["prestige"]]
-        ins_info_df.to_csv(os.path.join(self.save_fig_path, f"ins_information_{self.preference_type}.csv"),
+        ins_info_df.to_csv(os.path.join(self.save_data_path, f"ins_information_{self.preference_type}.csv"),
                            index=False)
         return ins_info_df
 
@@ -138,10 +136,12 @@ class PlotGenderPreference():
                 piechart[0][i].set_color("none")
                 piechart[0][i].set_edgecolor(sns.color_palette()[i])
         plt.tight_layout()
-        if self.preference_type == "neutral":
-            plt.savefig(os.path.join(self.save_fig_path, f"c-{tag}_{self.preference_type}.pdf"))
-        else:
-            plt.savefig(os.path.join(self.save_fig_path, f"d-{tag}_{self.preference_type}.pdf"))
+        pie_plot_path = os.path.join(self.save_fig_path, f"{tag}_pie")
+        try:
+            os.makedirs(pie_plot_path, exist_ok=True)
+        except:
+            pass
+        plt.savefig(os.path.join(pie_plot_path, f"{self.preference_type}_bf10.pdf"))
         plt.close()
 
     def plot_gender_preference_portion_vs_prestige(self, prestige_bin_col_name):
@@ -189,7 +189,19 @@ class PlotGenderPreference():
         plt.axhline(balanced_baseline, color=sns.color_palette()[2], ls="--", linewidth=1)
         plt.ylim(0, )
         plt.tight_layout()
-        plt.savefig(os.path.join(self.save_fig_path, f"{prestige_bin_col_name}_{self.preference_type}.pdf"))
+
+        preference_prestige_plot_meta_path = os.path.join(self.save_fig_path, f"preference_prestige")
+        try:
+            os.makedirs(preference_prestige_plot_meta_path, exist_ok=True)
+        except:
+            pass
+
+        preference_prestige_plot_path = os.path.join(preference_prestige_plot_meta_path, prestige_bin_col_name)
+        try:
+            os.makedirs(preference_prestige_plot_path, exist_ok=True)
+        except:
+            pass
+        plt.savefig(os.path.join(preference_prestige_plot_path, f"{self.preference_type}_bf10.pdf"))
 
     def cramer_v(self):
         # plot heatmap of the result and solo exhibition result
@@ -197,11 +209,13 @@ class PlotGenderPreference():
             os.path.join("..", "..", "..", "results",
                          f"threshold_{self.genderizeio_threshold}_filter_{self.remove_birth}",
                          "data",
-                         f"year_{self.career_start_threshold}", f"gender_{self.preference_type}_ins.json")))
+                         f"year_{self.career_start_threshold}", f"gender_{self.preference_type}_ins_bf10.json")))
 
         pairs = []
         print(len(reference_gender_preference_dict), len(self.gender_preference_dict))
         for key in self.gender_preference_dict:
+            if key not in reference_gender_preference_dict:
+                continue
             solo_result = self.gender_preference_dict[key]
             result = reference_gender_preference_dict[key]
             pairs.append((result, solo_result))
@@ -233,7 +247,6 @@ class PlotGenderPreference():
         else:
             plt.savefig(os.path.join(self.save_fig_path, f"d-gender_{self.preference_type}_heatmap.pdf"))
 
-
 def main():
     parser = argparse.ArgumentParser(
         description='select artists with career start year > [year_threshold]')
@@ -242,17 +255,16 @@ def main():
     parser.add_argument('-y', '--career_start_threshold', type=int,
                         help='earliest career start year of selected artists', default=1990)
     parser.add_argument('-p', '--preference_type', type=str, help='neutral or balance')
-    parser.add_argument('-a', '--save', action=argparse.BooleanOptionalAction)
     args = parser.parse_args()
 
     plotter = PlotGenderPreference(args.genderizeio_threshold, args.remove_birth,
-                                   args.career_start_threshold, args.preference_type, args.save)
+                                   args.career_start_threshold, args.preference_type, False)
     plotter.plot_pie_chart(tag="all")
     plotter.plot_pie_chart(tag="museum")
     plotter.plot_pie_chart(tag="gallery")
+    plotter.plot_gender_preference_portion_vs_prestige(prestige_bin_col_name="prestige_tenth_bin")
     plotter.plot_gender_preference_portion_vs_prestige(prestige_bin_col_name="prestige_40_70_bin")
     plotter.plot_gender_preference_portion_vs_prestige(prestige_bin_col_name="prestige_30_60_bin")
-    plotter.plot_gender_preference_portion_vs_prestige(prestige_bin_col_name="prestige_tenth_bin")
     plotter.cramer_v()
 
 

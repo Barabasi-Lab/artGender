@@ -57,7 +57,7 @@ class Logit:
         self.min_exh_data_path = os.path.join(self.year_data_path,
                                               f"minimum_exh_count_{self.num_exhibition_threshold}")
 
-        self.agg = pd.read_csv(os.path.join(self.year_data_path, f"artist_exh_info_agg_{self.preference_type}.csv"))
+        self.agg = pd.read_csv(os.path.join(self.year_data_path, f"artist_exh_info_agg_{self.preference_type}_bf10.csv"))
 
         self.agg = self.agg[(self.agg["exhibition_count"] >= self.num_exhibition_threshold) & (
                 self.agg["portion_overall"] != (0, 0, 0))]
@@ -155,7 +155,7 @@ class Logit:
                                 most_common_continent_encode,
                                 medium_encode], axis=1)
 
-        logit_data.to_csv(os.path.join(self.min_exh_data_path, "logit_data.csv"), index=False)
+        logit_data.to_csv(os.path.join(self.min_exh_data_path, "logit_data_bf10.csv"), index=False)
         return logit_data
 
     def plot_access_rate_vs_career_length_exhibit_count(self):
@@ -217,8 +217,8 @@ class Logit:
                          "career_length", "career_length_log"]
         scaler = MinMaxScaler()
         logit_data_processed[norm_features] = scaler.fit_transform(logit_data_processed[norm_features].to_numpy())
-        logit_data_processed.to_csv(os.path.join(self.min_exh_data_path, "logit_data_processed.csv"), index=False)
-        pickle.dump(scaler, open(os.path.join(self.min_exh_data_path, "logit_data_scaler.sav"), "wb"))
+        logit_data_processed.to_csv(os.path.join(self.min_exh_data_path, "logit_data_processed_bf10.csv"), index=False)
+        pickle.dump(scaler, open(os.path.join(self.min_exh_data_path, "logit_data_scaler_bf10.sav"), "wb"))
         return scaler, logit_data_processed
 
     def create_test_cases(self):
@@ -253,7 +253,7 @@ class Logit:
                                            random_state=random_state)
         # Combine minority class with downsampled majority class
         logit_data_downsampled = pd.concat([df_majority_downsampled, df_minority])
-        logit_data_downsampled.to_csv(os.path.join(self.min_exh_data_path, "logit_data_downsampled.csv"), index=False)
+        logit_data_downsampled.to_csv(os.path.join(self.min_exh_data_path, "logit_data_downsampled_bf10.csv"), index=False)
         return logit_data_downsampled
 
     def logit_statsmodel(self, formula, data):
@@ -354,10 +354,10 @@ class Logit:
         conf_int = [model.conf_int() for model in fitted_models]
 
 
-        df.to_excel(os.path.join(self.auction_fig_path, "logit_results.xlsx"))
-        df_bic.to_excel(os.path.join(self.auction_fig_path, "logit_bic.xlsx"))
-        df_dof.to_excel(os.path.join(self.auction_fig_path, "logit_dof.xlsx"))
-        df_nobs.to_excel(os.path.join(self.auction_fig_path, "logit_nobs.xlsx"))
+        df.to_excel(os.path.join(self.auction_fig_path, "logit_results_bf10.xlsx"))
+        df_bic.to_excel(os.path.join(self.auction_fig_path, "logit_bic_bf10.xlsx"))
+        df_dof.to_excel(os.path.join(self.auction_fig_path, "logit_dof_bf10.xlsx"))
+        df_nobs.to_excel(os.path.join(self.auction_fig_path, "logit_nobs_bf10.xlsx"))
 
 
 def main():
@@ -421,6 +421,7 @@ def main():
     print("downsampled f1 scores", [np.mean(scores) for scores in formula_auc_scores_downsampled])
 
     # case study df
+    print("Case Study Result")
     test_data_df = logit.create_test_cases()
     print(test_data_df)
     train_pred = logit_add_coexh_gender.predict(test_data_df)

@@ -12,36 +12,127 @@ import pandas as pd
 from adjustText import adjust_text
 from matplotlib.legend_handler import HandlerTuple
 from matplotlib.text import TextPath
-from scipy.stats import binom
+from scipy.stats import beta, binom
+from scipy.integrate import quad
+
+from tqdm import tqdm
 
 from plot_config import *
 
 mpl.rcParams['hatch.linewidth'] = 2
 
 
-def get_boundary(total_n, p_null, low, high, alpha=0.05):
-    sample_portion = np.logspace(
-        np.log10(low), np.log10(high), 100000, base=10)
-    low_line, mid_line, high_line = [], [], []
-    for each_portion in sample_portion:
-        each_n = int(total_n * each_portion)
-        neg_critical = binom.ppf(alpha, each_n, p_null)
-        pos_critical = binom.ppf(1 - alpha, each_n, p_null)
-        if str(neg_critical) == "nan" or str(pos_critical) == "nan":
+def bayesfactor_binom(k, n, p=0.5, a=1, b=1, oneside=False):
+    assert 0 < p < 1, "p must be between 0 and 1."
+    assert isinstance(k, int), "k must be int."
+    assert isinstance(n, int), "n must be int."
+    assert k <= n, "k (successes) cannot be higher than n (trials)."
+    assert a > 0, "a must be positive."
+    assert b > 0, "b must be positive."
+    def fun(g):
+        return beta.pdf(g, a, b) * binom.pmf(k, n, g)
+    if oneside:
+        if k / n <= p:
+            bf10 = quad(fun, 0, p)[0] / binom.pmf(k, n, p)
+        else:
+            bf10 = quad(fun, p, 1)[0] / binom.pmf(k, n, p)
+    else:
+        bf10 = quad(fun, 0, 1)[0] / binom.pmf(k, n, p)
+    return bf10
+
+
+def get_critical_values(n_total, p_null):
+    if p_null == 0.5:
+        if n_total < 1000:
+            portion_range = [0, 1]
+        elif n_total > 15000:
+            portion_range = [0.48, 0.52]
+        else:
+            portion_range = [0.4, 0.6]
+    else:
+        if n_total < 1000:
+            portion_range = [0, 1]
+        elif n_total > 15000:
+            portion_range = [0.34, 0.38]
+        else:
+            portion_range = [0.3, 0.5]
+    trials = range(int(n_total * portion_range[0])-1, int(n_total * p_null))[::-1]
+    bf10_list = []
+    after = 0
+    for n_trial in trials:
+        bf_score = bayesfactor_binom(n_trial, n_total, p=p_null, a=1, b=1, oneside=True)
+        bf10_list.append(bf_score)
+        if after < 3 and bf_score >= 3:
+            critical_value_menover = n_trial
+            break
+        else:
+            after = bf_score
+    # determine the lowest n_women to claim p_women > p
+    trials = range(int(n_total * p_null), int(n_total * portion_range[1]) + 1)
+    bf10_list = []
+    previous = 0
+    for n_trial in trials:
+        bf_score = bayesfactor_binom(n_trial, n_total, p=p_null, a=1, b=1, oneside=True)
+        bf10_list.append(bf_score)
+        if previous < 3 and bf_score >= 3:
+            critical_value_womenover = n_trial
+            break
+        else:
+            previous = bf_score
+    # determine the gender neutral range
+    trials = range(int(n_total * portion_range[0]), int(n_total * portion_range[1]) + 1)
+    bf10_list = []
+    for n_trial in trials:
+        bf_score = bayesfactor_binom(int(n_trial), n_total, p=p_null, a=1, b=1, oneside=False)
+        bf10_list.append(bf_score)
+        if bf_score < 1/3:
+            critical_null_low = n_trial
+            break
+    bf10_list = []
+    for n_trial in trials[::-1]:
+        bf_score = bayesfactor_binom(n_trial, n_total, p=p_null, a=1, b=1, oneside=False)
+        bf10_list.append(bf_score)
+        if bf_score < 1 / 3:
+            critical_null_high = n_trial
+            break
+    critical_value_womenover = max(critical_value_womenover, critical_null_high)
+    critical_value_menover = min(critical_value_menover, critical_null_high)
+    return critical_value_menover, critical_value_womenover, critical_null_low, critical_null_high
+
+
+def get_boundary(total_n, p_null, low, high):
+    samples = np.logspace(np.log10(low), np.log10(high), num=50) #np.logspace(np.log10(low), np.log10(high), 2, base=10)
+    sample_count = sorted(list(set(list(map(int, samples)))))
+    print(samples)
+    menover_line, womenover_line = [], []
+    null_low_line, null_high_line, null_mid_line = [], [], []
+    for each_n in tqdm(sample_count):
+        try:
+            critical_value_menover, critical_value_womenover, critical_null_low, critical_null_high = get_critical_values(
+                each_n, p_null)
+        except:
+            critical_value_menover, critical_value_womenover, critical_null_low, critical_null_high = 0, 0, 0, 0
+        menover_point = ((each_n - critical_value_menover), critical_value_menover)
+        womenover_point = ((each_n - critical_value_womenover), critical_value_womenover)
+        null_low_point = ((each_n - critical_null_low), critical_null_low)
+        null_high_point = ((each_n - critical_null_high), critical_null_high)
+        if menover_point in menover_line and womenover_point in womenover_line:
             continue
-        low_point = ((each_n - neg_critical),
-                     neg_critical)
-        high_point = ((each_n - pos_critical),
-                      pos_critical)
-        if low_point in low_line and high_point in high_line:
-            continue
-        low_line.append(low_point)
-        high_line.append(high_point)
-        mid_line.append((each_n - each_n * p_null, each_n * p_null))
-    low_x, low_y = zip(*low_line)
-    mid_x, mid_y = zip(*mid_line)
-    high_x, high_y = zip(*high_line)
-    return (low_x, low_y, mid_x, mid_y, high_x, high_y)
+        menover_line.append(menover_point)
+        womenover_line.append(womenover_point)
+        null_low_line.append(null_low_point)
+        null_high_line.append(null_high_point)
+        null_mid_line.append((each_n - each_n * p_null, each_n * p_null))
+    menover_x, menover_y = zip(*menover_line)
+    womenover_x, womenover_y = zip(*womenover_line)
+    null_low_x, null_low_y = zip(*null_low_line)
+    null_high_x, null_high_y = zip(*null_high_line)
+    null_mid_x, null_mid_y = zip(*null_mid_line)
+    return {"menover_x": menover_x, "menover_y": menover_y,
+            "womenover_x": womenover_x, "womenover_y": womenover_y,
+            "null_low_x": null_low_x, "null_low_y": null_low_y,
+            "null_high_x": null_high_x, "null_high_y": null_high_y,
+            "null_mid_x": null_mid_x, "null_mid_y": null_mid_y}
 
 
 def get_gender_portion(df, groupby_attr="institution"):
@@ -78,49 +169,37 @@ def plot_scatter(artists_select, shows_select, neutral_dict, balance_dict, marke
                  groupby_attr="institution"):
     # get_boundary
     p_null = Counter(artists_select["gender_recog"])["Female"] / len(artists_select)
-    alpha = 0.05
     total_n = len(shows_select)
-    total_female = len(
-        artists_select[artists_select["gender_recog"] == "Female"])
+    total_female = len(artists_select[artists_select["gender_recog"] == "Female"])
     total_male = len(artists_select[artists_select["gender_recog"] == "Male"])
-    low, high = 10 ** (-8), 8
-    low_x_neutral, low_y_neutral, mid_x_neutral, mid_y_neutral, high_x_neutral, high_y_neutral = get_boundary(
-        total_n, p_null, low, high, alpha=0.05)
-    low_x_balance, low_y_balance, mid_x_balance, mid_y_balance, high_x_balance, high_y_balance = get_boundary(
-        total_n, 0.5, low, high, alpha=0.05)
+    groupby_attr_counts = shows_select.groupby(groupby_attr)["show"].count()
+    low, high = min(groupby_attr_counts), max(groupby_attr_counts) * 1.01
+    critical_points_neutral = get_boundary(total_n, p_null, 10, high)
+    critical_points_balance = get_boundary(total_n, 0.5, 10, high)
     # save data for plot
     df_neutral = pd.DataFrame()
-    df_neutral["low_x"] = low_x_neutral
-    df_neutral["low_y"] = low_y_neutral
-    df_neutral["mid_x"] = mid_x_neutral
-    df_neutral["mid_y"] = mid_y_neutral
-    df_neutral["high_x"] = high_x_neutral
-    df_neutral["high_y"] = high_y_neutral
-    df_neutral.to_csv(
-        "../main_paper_plot_data/2D-3B-boundary_neutral.csv", index=False)
+    for key in critical_points_neutral:
+        df_neutral[key] = critical_points_neutral[key]
+    if groupby_attr == "country":
+        df_neutral.to_csv(
+            "../main_paper_plot_data/2D-3B-boundary_neutral_bf10.csv", index=False)
     df_balance = pd.DataFrame()
-    df_balance["low_x"] = low_x_balance
-    df_balance["low_y"] = low_y_balance
-    df_balance["mid_x"] = mid_x_balance
-    df_balance["mid_y"] = mid_y_balance
-    df_balance["high_x"] = high_x_balance
-    df_balance["high_y"] = high_y_balance
-    df_balance.to_csv(
-        "../main_paper_plot_data/2D-3B-boundary_balance.csv", index=False)
+    for key in critical_points_balance:
+        df_balance[key] = critical_points_balance[key]
+    if groupby_attr == "country":
+        df_balance.to_csv(
+            "../main_paper_plot_data/2D-3B-boundary_balance_bf10.csv", index=False)
     # get portion data frame
-    df_gender_portion = get_gender_portion(
-        shows_select, groupby_attr=groupby_attr)
+    df_gender_portion = get_gender_portion(shows_select, groupby_attr=groupby_attr)
     if groupby_attr == "institution":
-        df_gender_portion = df_gender_portion[df_gender_portion["name"].isin(
-            list(map(int, list(neutral_dict.keys()))))]
+        df_gender_portion = df_gender_portion[df_gender_portion["name"].isin(list(map(int, list(neutral_dict.keys()))))]
+        df_gender_portion = df_gender_portion[df_gender_portion["name"].isin(list(map(int, list(balance_dict.keys()))))]
     else:
-        df_gender_portion = df_gender_portion[df_gender_portion["name"].isin(
-            neutral_dict)]
+        df_gender_portion = df_gender_portion[df_gender_portion["name"].isin(neutral_dict)]
+        df_gender_portion = df_gender_portion[df_gender_portion["name"].isin(balance_dict)]
     if groupby_attr == "institution":  # take top 100 prestigious and add type
-        gallery_type_ins_name = {
-            i: gallery_dict[i]["type"] for i in gallery_dict}
-        df_gender_portion["type"] = [
-            gallery_type_ins_name[str(ins)] for ins in df_gender_portion["name"]]
+        gallery_type_ins_name = {i: gallery_dict[i]["type"] for i in gallery_dict}
+        df_gender_portion["type"] = [gallery_type_ins_name[str(ins)] for ins in df_gender_portion["name"]]
         prestige_ins = shows_select[shows_select["institution"].isin(df_gender_portion["name"])][[
             "institution", "percentile_prestige"]].drop_duplicates().sort_values("percentile_prestige")
         top_prestige_ins = prestige_ins.tail(100)["institution"]
@@ -134,13 +213,13 @@ def plot_scatter(artists_select, shows_select, neutral_dict, balance_dict, marke
         df_gender_portion = df_gender_portion[df_gender_portion["name"].isin(top_prestige_ins)]
     # add neutral and balance info to the df
     map_dict = {0: "Neutral", 1: "Man-Preferred", 2: "Woman-Preferred"}
-    df_gender_portion["Gender-Neutral Criteria"] = [
-        map_dict[neutral_dict[str(item)]] for item in df_gender_portion["name"]]
+    df_gender_portion["Gender-Neutral Criteria"] = [map_dict[neutral_dict[str(item)]] for item in df_gender_portion["name"]]
     map_dict = {0: "Balance", 1: "Man-Preferred", 2: "Woman-Preferred"}
-    df_gender_portion["Gender-Balanced Criteria"] = [
-        map_dict[balance_dict[str(item)]] for item in df_gender_portion["name"]]
+    df_gender_portion["Gender-Balanced Criteria"] = [map_dict[balance_dict[str(item)]] for item in df_gender_portion["name"]]
+    # filter df_gender_portion
+    df_gender_portion = df_gender_portion[(df_gender_portion['male_portion'] >= 10) & (df_gender_portion['female_portion']>=10)]
     # save data for plotting
-    df_gender_portion.to_csv("../main_paper_plot_data/%s.csv" % figname, index=False)
+    df_gender_portion.to_csv("../main_paper_plot_data/%s_bf10.csv" % figname, index=False)
     # scatter plotMain Paper Data
     fig, ax = plt.subplots(figsize=(6, 6))
     if groupby_attr == "country":
@@ -149,7 +228,7 @@ def plot_scatter(artists_select, shows_select, neutral_dict, balance_dict, marke
             neutral, balance = neutral_dict[str(item)], balance_dict[str(item)]
             plt.plot([male_portion], [female_portion],
                      "o", **marker_style[(balance, neutral)])
-    else:  # seperate gallery and musuems
+    else:  # seperate gallery and museums
         for item, male_portion, female_portion, ins_type in zip(df_gender_portion["name"],
                                                                 df_gender_portion['male_portion'],
                                                                 df_gender_portion['female_portion'],
@@ -163,44 +242,52 @@ def plot_scatter(artists_select, shows_select, neutral_dict, balance_dict, marke
                 plt.plot([male_portion], [female_portion],
                          "o", **this_marker_style)
     # add boundary and fill
-    lower_bound = min(list(
-        df_gender_portion["female_portion"]) + list(df_gender_portion["male_portion"]))
-    upper_bound = max(list(df_gender_portion[
-                               "female_portion"]) + list(df_gender_portion["male_portion"]))
-    plt.xlim(0.9 * lower_bound, 1.1 * upper_bound)
-    plt.ylim(0.9 * lower_bound, 1.1 * upper_bound)
+    lower_bound = min(list(df_gender_portion["female_portion"]) + list(df_gender_portion["male_portion"]))
+    upper_bound = max(list(df_gender_portion["female_portion"]) + list(df_gender_portion["male_portion"]))
+    plt.xlim(10, 1.1 * upper_bound)
+    plt.ylim(10, 1.1 * upper_bound)
     # add fill
-    darker_colors = ["#91b2e5", "#FF9595", "#6BD5BA"]
     darker_colors = ["#ADC4EA", "#FFA7B8", "#9CE3D1"]  # balance
     lighter_colors = ["#cddbf2", "#ffd3db", "#cdf1e8"]  # neutral
-    neutral1 = plt.fill_between(high_x_neutral, y1=high_y_neutral, y2=1.1 * upper_bound, color="None",
-                                facecolor=lighter_colors[1], zorder=0, rasterized=True)
-    neutral2 = plt.fill_between(low_x_neutral, y1=low_y_neutral, y2=high_y_neutral, color="None",
+
+    # fill neutral
+    # neutral1 = plt.fill_between(df_neutral["womenover_x"], y1=df_neutral["womenover_y"], y2=1.1 * upper_bound,
+    #                             color="None",
+    #                             facecolor=lighter_colors[1], zorder=0, rasterized=True)
+    neutral2 = plt.fill_between(df_neutral["null_low_x"], y1=df_neutral["null_low_y"], y2=df_neutral["null_high_y"],
+                                color="None",
                                 facecolor=lighter_colors[2], zorder=0, rasterized=True)
-    plt.fill_between(high_x_neutral, y1=low_y_neutral, y2=high_y_neutral, color="None",
+    plt.fill_between(df_neutral["null_high_x"], y1=df_neutral["null_high_y"], y2=df_neutral["null_low_y"], color="None",
                      facecolor=lighter_colors[2], zorder=0, rasterized=True)
-    neutral0 = plt.fill_between(low_x_neutral, y1=0.9 * lower_bound, y2=low_y_neutral, color="None",
-                                facecolor=lighter_colors[0], zorder=0, rasterized=True)
-    balance1 = plt.fill_between(high_x_balance, y1=high_y_balance, y2=1.1 * upper_bound, color="None",
-                                edgecolor=darker_colors[1], zorder=0, hatch=3 * "-", rasterized=True)
-    balance2 = plt.fill_between(low_x_balance, y1=low_y_balance, y2=low_x_balance, color="None",
-                                edgecolor=darker_colors[2], zorder=0, hatch=3 * "-", rasterized=True)
-    plt.fill_between(high_x_balance, y1=high_x_balance, y2=high_y_balance, color="None",
-                     edgecolor=darker_colors[2], zorder=0, hatch=3 * "-", rasterized=True)
-    balance0 = plt.fill_between(low_x_balance, y1=0.9 * lower_bound, y2=low_y_balance, color="None",
-                                edgecolor=darker_colors[0], zorder=0, hatch=3 * "-", rasterized=True)
+    # neutral0 = plt.fill_between(df_neutral["menover_x"], y1=0.9 * lower_bound, y2=df_neutral["menover_y"], color="None",
+    #                             facecolor=lighter_colors[0], zorder=0, rasterized=True)
+
+    # fill_balance
+    # balance1 = plt.fill_between(df_balance["womenover_x"], y1=df_balance["womenover_y"], y2=1.1 * upper_bound,
+    #                             color="None",
+    #                             facecolor=darker_colors[1], zorder=0, rasterized=True, hatch=3 * "-")
+    balance2 = plt.fill_between(df_balance["null_low_x"], y1=df_balance["null_low_y"], y2=df_balance["null_high_y"],
+                                color="None",
+                                facecolor=darker_colors[2], zorder=0, rasterized=True, hatch=3 * "-")
+    plt.fill_between(df_balance["null_high_x"], y1=df_balance["null_high_y"], y2=df_balance["null_low_y"], color="None",
+                     facecolor=darker_colors[2], zorder=0, rasterized=True, hatch=3 * "-")
+    # balance0 = plt.fill_between(df_balance["menover_x"], y1=0.9 * lower_bound, y2=df_balance["menover_y"], color="None",
+    #                             facecolor=darker_colors[0], zorder=0, rasterized=True, hatch=3 * "-")
     # add boundary
-    plt.plot(low_x_neutral, low_y_neutral, ls="--", lw=0.5, color="gray", zorder=0)
-    neutral_bound, = plt.plot(mid_x_neutral, mid_y_neutral,
-                              ls="--", lw=1, color="gray", zorder=0)
-    plt.plot(high_x_neutral, high_y_neutral, ls="--",
-             lw=0.5, color="gray", zorder=0)
-    plt.plot(low_x_balance, low_y_balance, ls="-.",
-             lw=0.5, color="#4c4c4c", zorder=0)
-    balance_bound, = plt.plot(
-        mid_x_balance, mid_y_balance, ls="-", lw=1, color="#4c4c4c", zorder=0)
-    plt.plot(high_x_balance, high_y_balance, ls="-.",
-             lw=0.5, color="#4c4c4c", zorder=0)
+    # neutral boundary
+    # plt.plot(df_neutral["womenover_x"], df_neutral["womenover_y"], ls="--", lw=0.5, color="gray", zorder=0)
+    # plt.plot(df_neutral["menover_x"], df_neutral["menover_y"], ls="--", lw=0.5, color="gray", zorder=0)
+    neutral_bound, = plt.plot(df_neutral["null_low_x"], df_neutral["null_low_y"], ls="--", lw=1, color="gray", zorder=0)
+    neutral_bound, = plt.plot(df_neutral["null_high_x"], df_neutral["null_high_y"], ls="--", lw=1, color="gray",
+                              zorder=0)
+
+    # balance boundary
+    # plt.plot(df_balance["womenover_x"], df_balance["womenover_y"], ls="-.", lw=0.5, color="#4c4c4c", zorder=0)
+    # plt.plot(df_balance["menover_x"], df_balance["menover_y"], ls="-.", lw=0.5, color="#4c4c4c", zorder=0)
+    balance_bound, = plt.plot(df_balance["null_low_x"], df_balance["null_low_x"], ls="-", lw=1, color="#4c4c4c", zorder=0)
+    neutral_bound, = plt.plot(df_balance["null_high_x"], df_balance["null_high_y"], ls="--", lw=1, color="gray",
+                              zorder=0)
+
     plt.xscale('log')
     plt.yscale('log')
     # create legend
@@ -250,12 +337,10 @@ def plot_scatter(artists_select, shows_select, neutral_dict, balance_dict, marke
     else:
         key = "name"
     df_gender_portion.sort_values("male_portion", ascending=False).to_csv(
-        "../main_paper_plot_data/df_gender_portion_%s.csv" % groupby_attr, index=False)
+        "../main_paper_plot_data/df_gender_portion_%s_bf10.csv" % groupby_attr, index=False)
     for i, name in enumerate(df_gender_portion.sort_values("male_portion", ascending=False)[key]):
-        x = list(df_gender_portion[df_gender_portion[
-                                       key] == name]["male_portion"])[0]
-        y = list(df_gender_portion[df_gender_portion[
-                                       key] == name]["female_portion"])[0]
+        x = list(df_gender_portion[df_gender_portion[key] == name]["male_portion"])[0]
+        y = list(df_gender_portion[df_gender_portion[key] == name]["female_portion"])[0]
         if name in labels:
             texts.append(plt.text(x, y, name, fontsize=5,
                                   color=sns.color_palette()[-1], ha='center', va='center'))
@@ -267,14 +352,15 @@ def plot_scatter(artists_select, shows_select, neutral_dict, balance_dict, marke
     plt.ylabel("Number of Female Exhibitions")
     plt.tight_layout()
     plt.savefig(
-        os.path.join("../results/threshold_0.6_filter_True", "figures/year_1990", "%s_scatter.pdf" % figname), dpi=400)
+        os.path.join("../results/threshold_0.6_filter_True", "figures/year_1990", "%s_scatter_bf10.pdf" % figname),
+        dpi=400)
     plt.close()
 
 
 parser = argparse.ArgumentParser(
     description='earliest year for data selection')
-parser.add_argument('year', metavar='year', type=int,
-                    help='select year')
+parser.add_argument('--year', metavar='year', type=int,
+                    help='select year', default=1990)
 args = parser.parse_args()
 select_year = args.year
 
@@ -282,7 +368,8 @@ year_folder = "../results/threshold_0.6_filter_True/data/year_%s/" % select_year
 
 artists_select = pd.read_csv(os.path.join(year_folder, "artists_recog_select.csv"))
 shows_select = pd.read_csv(os.path.join(year_folder, "shows_select.csv"))
-percentile_prestige = json.load(open(os.path.join("../results/threshold_0.6_filter_True/data", "percentile_prestige.json")))
+percentile_prestige = json.load(
+    open(os.path.join("../results/threshold_0.6_filter_True/data", "percentile_prestige.json")))
 ins_name_mapping = json.load(open("../raw_data/ins_name_mapping.json"))
 gallery_dict = json.load(open("../raw_data/gallery_dict.json"))
 
@@ -293,18 +380,20 @@ lighter_cmap = {1: "#8BADE4", 2: "#FF738E", 0: "#61D3B6"}
 marker_style = create_marker_style(darker_cmap, lighter_cmap)
 
 # country
-gender_neutral_country = json.load(open(os.path.join(year_folder, "gender_neutral_country.json")))
-gender_balance_country = json.load(open(os.path.join(year_folder, "gender_balance_country.json")))
+gender_neutral_country = json.load(open(os.path.join(year_folder, "gender_neutral_country_bf10.json")))
+gender_balance_country = json.load(open(os.path.join(year_folder, "gender_balance_country_bf10.json")))
 label_country = {"United States", "Sweden", "China", "Norway", "Finland", "Tunisia", "Cameroon", "Venezuela", "Serbia",
-                 "Indonesia", "Algeria", "Dominican Republic", "Bangladesh", "Ireland", "Netherlands", "Slovenia",
+                 "Indonesia",
+                 # "Algeria", filtered with bayes factor
+                 "Dominican Republic", "Bangladesh", "Ireland", "Netherlands", "Slovenia",
                  "Iceland", "Vietnam", "Israel", "Turkey", "United Kingdom", "Switzerland", "Pakistan", "Canada",
                  "Armenia", "Egypt"}
 plot_scatter(artists_select, shows_select, gender_neutral_country, gender_balance_country,
              marker_style, label_country, figname="02-gender_preference_country", groupby_attr="country")
 
 # institutions
-gender_neutral_ins = json.load(open(os.path.join(year_folder, "gender_neutral_ins.json")))
-gender_balance_ins = json.load(open(os.path.join(year_folder, "gender_balance_ins.json")))
+gender_neutral_ins = json.load(open(os.path.join(year_folder, "gender_neutral_ins_bf10.json")))
+gender_balance_ins = json.load(open(os.path.join(year_folder, "gender_balance_ins_bf10.json")))
 label_ins = set(ins_name_mapping.values())
 plot_scatter(artists_select, shows_select, gender_neutral_ins, gender_balance_ins,
              marker_style, label_ins, figname="02-gender_preference_ins", groupby_attr="institution")

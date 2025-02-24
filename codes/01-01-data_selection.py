@@ -162,7 +162,7 @@ class SelectData:
 
         if self.save:
             # save data for alice
-            career_start_year_artist_count.to_csv("../for_plotting//Main Paper Data/1B_top_line.csv", index=False)
+            career_start_year_artist_count.to_csv("../main_paper_plot_data/1B_top_line.csv", index=False)
             career_start_year_artist_count_select.to_csv("../main_paper_plot_data/1B_top_shade.csv", index=False)
             shows_count.to_csv("../main_paper_plot_data/1B_bottom_line.csv", index=False)
             shows_select_count.to_csv("../main_paper_plot_data/1B_bottom_shade.csv", index=False)
@@ -325,6 +325,8 @@ def main():
     # select
     select_data.get_select_artists()
     select_data.filter_data()
+    print(select_data.shows_select)
+    print(select_data.solo_shows_select)
     # save
     select_data.save_data()
     # report

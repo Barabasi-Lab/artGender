@@ -63,7 +63,7 @@ class PlotGenderPreference():
         self.artists_recog_select = pd.read_csv(os.path.join(self.save_data_path, "artists_recog_select.csv"))
         self.shows_select = pd.read_csv(os.path.join(self.save_data_path, "shows_select.csv"))
         self.gender_preference_dict = json.load(open(
-            os.path.join(self.save_data_path, f"gender_{self.preference_type}_ins.json")))
+            os.path.join(self.save_data_path, f"gender_{self.preference_type}_ins_bf10.json")))
 
         self.ins_info_df = self.get_ins_info_df()
         self.gender_preference_df, self.museum_gender_preference_df, self.gallery_gender_preference_df = self.get_gender_preference_df()
@@ -71,13 +71,13 @@ class PlotGenderPreference():
         if self.save:
             # save all data
             alice_label = "1" if self.preference_type == "balance" else "4"
-            self.gender_preference_df.to_csv("../main_paper_plot_data/2C-%s.csv" % alice_label, index=False)
+            self.gender_preference_df.to_csv("../main_paper_plot_data/2C-%s_bf10.csv" % alice_label, index=False)
             # save museum data
             alice_label = "2" if self.preference_type == "balance" else "5"
-            self.museum_gender_preference_df.to_csv("../main_paper_plot_data/2C-%s.csv" % alice_label, index=False)
+            self.museum_gender_preference_df.to_csv("../main_paper_plot_data/2C-%s_bf10.csv" % alice_label, index=False)
             # save gallery data
             alice_label = "3" if self.preference_type == "balance" else "6"
-            self.gallery_gender_preference_df.to_csv("../main_paper_plot_data/2C-%s.csv" % alice_label,
+            self.gallery_gender_preference_df.to_csv("../main_paper_plot_data/2C-%s_bf10.csv" % alice_label,
                                                      index=False)
 
     def get_ins_info_df(self):
@@ -109,12 +109,13 @@ class PlotGenderPreference():
              for percentile in [10, 20, 30, 40, 50, 60, 70, 80, 90]] + [1.1])
         ins_info_df["prestige_tenth_bin"] = [np.digitize(item, tenth_bins) for item in ins_info_df["prestige"]]
         ins_info_df.to_csv(os.path.join(self.save_data_path, f"ins_information_{self.preference_type}.csv"),
-                                        index=False)
+                           index=False)
         return ins_info_df
 
     def get_gender_preference_df(self):
         # all
         count = Counter(self.gender_preference_dict.values())
+        print(count)
         gender_preference_df = pd.DataFrame({"Equality": ["Male-Preferred", "Female-Preferred", "Balanced"],
                                              "Count": [count[1], count[2], count[0]]})
         # museum
@@ -152,7 +153,7 @@ class PlotGenderPreference():
             os.makedirs(pie_plot_path, exist_ok=True)
         except:
             pass
-        plt.savefig(os.path.join(pie_plot_path, f"{self.preference_type}.pdf"))
+        plt.savefig(os.path.join(pie_plot_path, f"{self.preference_type}_bf10.pdf"))
         plt.close()
 
     def plot_gender_preference_portion_vs_prestige(self, prestige_bin_col_name):
@@ -175,7 +176,7 @@ class PlotGenderPreference():
             female_portion_list.append(female_count / total_count)
             balanced_portion_list.append(balance_count / total_count)
 
-        # print(prestige_list, male_portion_list, female_portion_list, balanced_portion_list)
+        print(prestige_list, male_portion_list, female_portion_list, balanced_portion_list)
         plt.plot(prestige_list, male_portion_list, "o-", color=sns.color_palette()[0], markersize=15)
         plt.plot(prestige_list, female_portion_list, "o-", color=sns.color_palette()[1], markersize=15)
         plt.plot(prestige_list, balanced_portion_list, "o-", color=sns.color_palette()[2], markersize=15)
@@ -212,7 +213,7 @@ class PlotGenderPreference():
             os.makedirs(preference_prestige_plot_path, exist_ok=True)
         except:
             pass
-        plt.savefig(os.path.join(preference_prestige_plot_path, f"{self.preference_type}.pdf"))
+        plt.savefig(os.path.join(preference_prestige_plot_path, f"{self.preference_type}_bf10.pdf"))
 
         if self.save:
             df = pd.DataFrame()
@@ -220,11 +221,11 @@ class PlotGenderPreference():
             df["Man-Preferred Portion"] = male_portion_list
             df["Woman-Preferred Portion"] = female_portion_list
             df["%s Portion" % self.preference_type.title()] = balanced_portion_list
-            df.to_csv("../main_paper_plot_data/%s_portion_prestige.csv" % self.preference_type, index=False)
+            df.to_csv("../main_paper_plot_data/%s_portion_prestige_bf10.csv" % self.preference_type, index=False)
 
             baseline = {"male": male_baseline, "female": female_baseline, self.preference_type: balanced_baseline}
-            json.dump(baseline, open("../main_paper_plot_data/%s_portion_prestige_baseline.json" %
-                                     self.preference_type, "w"))
+            json.dump(baseline,
+                      open(f"../main_paper_plot_data/{self.preference_type}_portion_prestige_baseline_bf10.json", "w"))
 
 
 def main():
@@ -243,9 +244,9 @@ def main():
     plotter.plot_pie_chart(tag="all")
     plotter.plot_pie_chart(tag="museum")
     plotter.plot_pie_chart(tag="gallery")
+    plotter.plot_gender_preference_portion_vs_prestige(prestige_bin_col_name="prestige_tenth_bin")
     plotter.plot_gender_preference_portion_vs_prestige(prestige_bin_col_name="prestige_40_70_bin")
     plotter.plot_gender_preference_portion_vs_prestige(prestige_bin_col_name="prestige_30_60_bin")
-    plotter.plot_gender_preference_portion_vs_prestige(prestige_bin_col_name="prestige_tenth_bin")
 
 
 if __name__ == '__main__':

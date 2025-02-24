@@ -54,7 +54,7 @@ class CareerGenderPreference:
         self.artists_recog_select = pd.read_csv(os.path.join(self.year_data_path, "artists_recog_select.csv"))
         self.shows_select = pd.read_csv(os.path.join(self.year_data_path, "shows_select.csv"))
         self.gender_preference_dict = json.load(open(
-            os.path.join(self.year_data_path, f"gender_{self.preference_type}_ins.json")))
+            os.path.join(self.year_data_path, f"gender_{self.preference_type}_ins_bf10.json")))
 
         self.shows_select["gender_preference"] = [int(self.gender_preference_dict[str(ins)])
                                                   if str(ins) in self.gender_preference_dict else np.nan
@@ -62,7 +62,7 @@ class CareerGenderPreference:
 
         self.null_portion = self.get_null_portion()
 
-        self.agg_fname = os.path.join(self.year_data_path, f"artist_exh_info_agg_{self.preference_type}.csv")
+        self.agg_fname = os.path.join(self.year_data_path, f"artist_exh_info_agg_{self.preference_type}_bf10.csv")
         if not os.path.exists(self.agg_fname):
             self.agg = self.get_agg_artist_df()
         else:
@@ -232,13 +232,14 @@ class CareerGenderPreference:
         if coexhibit_gender_col == "ins_gender_init":
             fig_path = os.path.join(coexh_gender_vs_gender_fig_path, "early_career")
             os.makedirs(fig_path, exist_ok=True)
-            plt.savefig(os.path.join(fig_path, f"{self.preference_type}.pdf"))
+            plt.savefig(os.path.join(fig_path, f"{self.preference_type}_bf10.pdf"))
         else:
             fig_path = os.path.join(coexh_gender_vs_gender_fig_path, "full_career")
             os.makedirs(fig_path, exist_ok=True)
-            plt.savefig(os.path.join(fig_path, f"{self.preference_type}.pdf"))
-        if self.save and self.preference_type == "neutral":
-            agg_percent.to_csv('../main_paper_plot_data/ins_gender.csv', index=False)
+            plt.savefig(os.path.join(fig_path, f"{self.preference_type}_bf10.pdf"))
+            if self.save and self.preference_type == "neutral":
+                print(agg_percent)
+                agg_percent.to_csv('../main_paper_plot_data/ins_gender_bf10.csv', index=False)
 
     def plot_coexhibit_gender_vs_gender_vs_prestige_count(self, prestige_bin_col_name):
         agg_percent = self.agg_legit.groupby(["gender_recog", prestige_bin_col_name])["ins_gender"].value_counts(
@@ -295,9 +296,9 @@ class CareerGenderPreference:
 
         fig_path = os.path.join(coexh_gender_vs_gender_vs_prestige_fig_path, prestige_bin_col_name)
         os.makedirs(fig_path, exist_ok=True)
-        plt.savefig(os.path.join(fig_path, f"{self.preference_type}.pdf"))
+        plt.savefig(os.path.join(fig_path, f"{self.preference_type}_bf10.pdf"))
         if self.save and self.preference_type == "neutral":
-            agg_percent.to_csv('../main_paper_plot_data/ins_gender_prestige.csv', index=False)
+            agg_percent.to_csv('../main_paper_plot_data/ins_gender_prestige_bf10.csv', index=False)
 
     @staticmethod
     def cal_confusion_matrix(count):
@@ -333,9 +334,9 @@ class CareerGenderPreference:
         fig_path = os.path.join(lockin_fig_path, "all")
         os.makedirs(fig_path, exist_ok=True)
 
-        plt.savefig(os.path.join(fig_path, f"{self.preference_type}.pdf"))
+        plt.savefig(os.path.join(fig_path, f"{self.preference_type}_bf10.pdf"))
         if self.save and self.preference_type == "neutral":
-            np.savetxt('../main_paper_plot_data/lockin_full.out', normalize_cm, delimiter=',')
+            np.savetxt('../main_paper_plot_data/lockin_full_bf10.out', normalize_cm, delimiter=',')
 
     def plot_coexhibit_gender_lockin_prestige(self):
         for prestige in ["Low", "Mid", "High"]:
@@ -360,10 +361,10 @@ class CareerGenderPreference:
             fig_path = os.path.join(lockin_fig_path, f"{prestige.lower()}_prestige")
             os.makedirs(fig_path, exist_ok=True)
 
-            plt.savefig(os.path.join(fig_path, f"{self.preference_type}.pdf"))
+            plt.savefig(os.path.join(fig_path, f"{self.preference_type}_bf10.pdf"))
 
             if self.save and self.preference_type == "neutral":
-                np.savetxt('../main_paper_plot_data/lockin_%s.out' %
+                np.savetxt('../main_paper_plot_data/lockin_%s_bf10.out' %
                            prestige, normalize_cm, delimiter=',')
 
     def plot_coexhibit_gender_transition_prestige(self):
@@ -391,7 +392,7 @@ class CareerGenderPreference:
         coexh_transition_fig_path = os.path.join(self.min_exh_fig_path, "coexh_transition")
         os.makedirs(coexh_transition_fig_path, exist_ok=True)
 
-        plt.savefig(os.path.join(coexh_transition_fig_path, f"{self.preference_type}.pdf"))
+        plt.savefig(os.path.join(coexh_transition_fig_path, f"{self.preference_type}_bf10.pdf"))
 
 
 def main():
@@ -416,11 +417,11 @@ def main():
     career_gender_preference.plot_coexhibit_gender_vs_gender_count(coexhibit_gender_col="ins_gender")
     career_gender_preference.plot_coexhibit_gender_vs_gender_count(coexhibit_gender_col="ins_gender_init")
     career_gender_preference.plot_coexhibit_gender_vs_gender_vs_prestige_count(
-        prestige_bin_col_name="prestige_40_70_bin")
+        prestige_bin_col_name="prestige_tenth_bin")
     career_gender_preference.plot_coexhibit_gender_vs_gender_vs_prestige_count(
         prestige_bin_col_name="prestige_30_60_bin")
     career_gender_preference.plot_coexhibit_gender_vs_gender_vs_prestige_count(
-        prestige_bin_col_name="prestige_tenth_bin")
+        prestige_bin_col_name="prestige_40_70_bin")
     career_gender_preference.plot_coexhibit_gender_lockin()
     career_gender_preference.plot_coexhibit_gender_lockin_prestige()
     career_gender_preference.plot_coexhibit_gender_transition_prestige()

@@ -39,7 +39,7 @@ class CareerGenderPreference:
         self.artists_recog_select = pd.read_csv(os.path.join(self.save_data_path, "artists_recog_select.csv"))
         self.shows_select = pd.read_csv(os.path.join(self.save_data_path, "solo_shows_select.csv"))
         self.gender_preference_dict = json.load(open(
-            os.path.join(self.save_fig_path, f"gender_{self.preference_type}_ins_solo.json")))
+            os.path.join(self.save_fig_path, f"gender_{self.preference_type}_ins_solo_bf10.json")))
 
         self.shows_select["gender_preference"] = [int(self.gender_preference_dict[str(ins)])
                                                   if str(ins) in self.gender_preference_dict else np.nan

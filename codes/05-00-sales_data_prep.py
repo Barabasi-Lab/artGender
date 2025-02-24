@@ -34,7 +34,7 @@ class PrepareSale:
         self.min_exh_data_path = os.path.join(self.year_data_path,
                                               f"minimum_exh_count_{self.num_exhibition_threshold}")
 
-        self.agg = pd.read_csv(os.path.join(self.year_data_path, f"artist_exh_info_agg_{self.preference_type}.csv"))
+        self.agg = pd.read_csv(os.path.join(self.year_data_path, f"artist_exh_info_agg_{self.preference_type}_bf10.csv"))
 
         # create agg_sales
         self.agg_sales = self.create_agg_sales()

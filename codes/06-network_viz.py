@@ -46,8 +46,8 @@ def G_add_info(G):
         open("../raw_data/ins_country_mapping.json"))
     percentile_prestige_dict = json.load(
         open(os.path.join("../results/threshold_0.6_filter_True/data", "percentile_prestige.json")))
-    ins_gender_neutral_dict = json.load(open(os.path.join(year_folder, "gender_neutral_ins.json")))
-    ins_gender_balance_dict = json.load(open(os.path.join(year_folder, "gender_balance_ins.json")))
+    ins_gender_neutral_dict = json.load(open(os.path.join(year_folder, "gender_neutral_ins_bf10.json")))
+    ins_gender_balance_dict = json.load(open(os.path.join(year_folder, "gender_balance_ins_bf10.json")))
     percentile_prestige_dict = {
         int(ins): percentile_prestige_dict[ins] for ins in percentile_prestige_dict}
     ins_country_dict = {int(ins): ins_country_dict[ins] for ins in ins_country_dict}
@@ -204,8 +204,8 @@ def get_rules(shows, fname, selected_nodes, support_threhold=10 ** (-7), confide
 
 parser = argparse.ArgumentParser(
     description='earliest year for data selection')
-parser.add_argument('year', metavar='year', type=int,
-                    help='select year')
+parser.add_argument('--year', metavar='year', type=int,
+                    help='select year', default=1990)
 
 args = parser.parse_args()
 select_year = args.year
@@ -216,15 +216,15 @@ shows_select = pd.read_csv(os.path.join(year_folder, "shows_select.csv"))
 gallery_dict = json.load(open("../raw_data/gallery_dict.json"))
 shows_select["ins_type"] = [gallery_dict[str(ins)]["type"] for ins in shows_select["institution"]]
 
-ins_gender_neutral_dict = json.load(open(os.path.join(year_folder, "gender_neutral_ins.json")))
-ins_gender_balance_dict = json.load(open(os.path.join(year_folder, "gender_balance_ins.json")))
+ins_gender_neutral_dict = json.load(open(os.path.join(year_folder, "gender_neutral_ins_bf10.json")))
+ins_gender_balance_dict = json.load(open(os.path.join(year_folder, "gender_balance_ins_bf10.json")))
 selected_nodes = list(map(int, list(ins_gender_neutral_dict.keys())))
 
 support, confidence, contribution, lift = get_rules(
-    shows_select, fname="full_asso_default_filter", selected_nodes=selected_nodes)
+    shows_select, fname="full_asso_default_filter_bf10", selected_nodes=selected_nodes)
 
 support, confidence, contribution, lift = get_rules(
-    shows_select, fname="full_asso", selected_nodes=selected_nodes, support_threhold=0, confidence_threshold=0,
+    shows_select, fname="full_asso_bf10", selected_nodes=selected_nodes, support_threhold=0, confidence_threshold=0,
     contribution_threshold=0, lift_threshold=0)
 
 # support, confidence, contribution, lift = get_rules(

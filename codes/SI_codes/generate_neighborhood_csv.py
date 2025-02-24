@@ -33,12 +33,12 @@ class NeighborhoodAnalysis:
                                           "fig1")
 
         # get or generate dataframe
-        dataframe_path = os.path.join(self.save_fig_path, f"institution_neighborhood_info_{self.preference_type}.csv")
+        dataframe_path = os.path.join(self.save_fig_path, f"institution_neighborhood_info_{self.preference_type}_bf10.csv")
         if os.path.exists(dataframe_path):
             self.df = pd.read_csv(dataframe_path)
         else:
             # read data
-            self.G = nx.read_gml(os.path.join(self.save_data_path, "year_1990", "full_asso.gml"))
+            self.G = nx.read_gml(os.path.join(self.save_data_path, "year_1990", "full_asso_bf10.gml"))
             self.percentile_prestige = json.load(open(os.path.join(self.save_data_path, "percentile_prestige.json")))
             self.gender_preference_dict = nx.get_node_attributes(self.G, self.attribute)
             self.df = self.get_neighborhood_info()
@@ -63,24 +63,27 @@ class NeighborhoodAnalysis:
         in_male_strength_portion_list, in_female_strength_portion_list, in_balanced_strength_portion_list = [], [], []
         male_strength_portion_list, female_strength_portion_list, balanced_strength_portion_list = [], [], []
         for node in degree:
+            if node not in self.gender_preference_dict:
+                continue
+            suc_neighbors = set(self.G.successors(node))
+            pre_neighbors = set(self.G.predecessors(node))
+            # all neighbors
+            neighbors = set(suc_neighbors).union(pre_neighbors)
+            neighbors_bin = [self.gender_preference_dict[n] for n in neighbors if n != node and n in self.gender_preference_dict]
+            bin_count = Counter(neighbors_bin)
+            if sum(bin_count.values()) == 0:
+                continue
+            portion_dict = {key: bin_count[key] / sum(bin_count.values()) for key in [0, 1, 2]}
             node_list.append(node)
             degree_list.append(degree[node])
             weighted_degree_list.append(weighted_degree[node])
             gender_preference_list.append(self.gender_preference_dict[node])
             node_prestige_list.append(self.percentile_prestige[node])
-            suc_neighbors = set(self.G.successors(node))
-            pre_neighbors = set(self.G.predecessors(node))
-            # all neighbors
-            neighbors = set(suc_neighbors).union(pre_neighbors)
-            neighbors_bin = [self.gender_preference_dict[n] for n in neighbors if n != node]
-            bin_count = Counter(neighbors_bin)
-            portion_dict = {key: bin_count[
-                                     key] / sum(bin_count.values()) for key in [0, 1, 2]}
             balance_neighbor_portion_list.append(portion_dict[0])
             male_neighbor_portion_list.append(portion_dict[1])
             female_neighbor_portion_list.append(portion_dict[2])
             # out_neighbors
-            neighbors_bin = [self.gender_preference_dict[n] for n in suc_neighbors if n != node]
+            neighbors_bin = [self.gender_preference_dict[n] for n in suc_neighbors if n != node and n in self.gender_preference_dict]
             bin_count = Counter(neighbors_bin)
             if sum(bin_count.values()) == 0:
                 balance_suc_portion_list.append(np.nan)
@@ -93,7 +96,7 @@ class NeighborhoodAnalysis:
                 male_suc_portion_list.append(portion_dict[1])
                 female_suc_portion_list.append(portion_dict[2])
             # in_neighbors
-            neighbors_bin = [self.gender_preference_dict[n] for n in pre_neighbors if n != node]
+            neighbors_bin = [self.gender_preference_dict[n] for n in pre_neighbors if n != node and n in self.gender_preference_dict]
             bin_count = Counter(neighbors_bin)
             if sum(bin_count.values()) == 0:
                 balance_pre_portion_list.append(np.nan)
@@ -111,7 +114,7 @@ class NeighborhoodAnalysis:
             # out_edges
             temp_0, temp_1, temp_2, out_weight_sum = 0, 0, 0, 0
             for (_, target, weight) in out_edges:
-                if target == node:
+                if target == node or target not in self.gender_preference_dict:
                     continue
                 target_bin = self.gender_preference_dict[target]
                 out_weight_sum += weight
@@ -133,7 +136,7 @@ class NeighborhoodAnalysis:
             # in_edges
             temp_0, temp_1, temp_2, in_weight_sum = 0, 0, 0, 0
             for (target, _, weight) in in_edges:
-                if target == node:
+                if target == node or target not in self.gender_preference_dict:
                     continue
                 target_bin = self.gender_preference_dict[target]
                 in_weight_sum += weight
@@ -155,7 +158,7 @@ class NeighborhoodAnalysis:
             # all edges
             temp_0, temp_1, temp_2, weight_sum = 0, 0, 0, 0
             for (_, target, weight) in out_edges:
-                if target == node:
+                if target == node or target not in self.gender_preference_dict:
                     continue
                 target_bin = self.gender_preference_dict[target]
                 weight_sum += weight
@@ -166,7 +169,7 @@ class NeighborhoodAnalysis:
                 else:
                     temp_2 += weight
             for (target, _, weight) in in_edges:
-                if target == node:
+                if target == node or target not in self.gender_preference_dict:
                     continue
                 target_bin = self.gender_preference_dict[target]
                 weight_sum += weight
@@ -245,7 +248,7 @@ class NeighborhoodAnalysis:
                 ax.text(x, y, "%.1f" % (c * 100) + "%", ha=ha, va='center',
                             color="white", fontsize=12)
         plt.xticks([])
-        plt.gca().set_yticklabels(["Man-Preferred", "Woman-Preferred",
+        plt.gca().set_yticklabels(["Man-Overrepresented", "Woman-Overrepresented",
                                    "Gender-Neutral"][::-1])
         plt.tight_layout()
         plt.savefig(os.path.join(self.save_fig_path, "%s.pdf" % figname))
@@ -347,7 +350,7 @@ class NeighborhoodAnalysis:
                      s=text_order[i], va="top", ha="center")
         ax1.set_xlabel("")
         ax1.set_ylabel("Weighted Out Neighborhood Portion")
-        ax1.set_title("Man-Preferred Institutions")
+        ax1.set_title("Man-Overrepresented Institutions")
         ax1.legend_.remove()
 
         sns.barplot(x="gender_bias", y="woman_preferred_portion", hue="prestige",
@@ -360,7 +363,7 @@ class NeighborhoodAnalysis:
                      s=text_order[i], va="top", ha="center")
         ax2.set_xlabel("")
         ax2.set_ylabel("Weighted Out Neighborhood Portion")
-        ax2.set_title("Woman-Preferred Institutions")
+        ax2.set_title("Woman-Overrepresented Institutions")
         ax2.legend_.remove()
 
         sns.barplot(x="gender_bias", y="balance_preferred_portion", hue="prestige",
