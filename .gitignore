@@ -10,3 +10,4 @@ __pycache__/
 */*/__pycache__/
 codes/SI_codes/MultiscaleMixing/.ipynb_checkpoints/
 codes/SI_codes/MultiscaleMixing/network_data/*
+codes/plot_country_preference/*.svg
